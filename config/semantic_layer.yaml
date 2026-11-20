@@ -1,0 +1,112 @@
+version: "1.2"
+domain: "Mercado de Crédito Brasileiro e Macroeconomia (Banco Central do Brasil - API SGS)"
+database_dialect: "sqlite"
+
+# 1. MAPEAMENTO EXATO DAS TABELAS E COLUNAS
+tables:
+  fato_indicadores_credito:
+    description: "Tabela fato mensal com indicadores de crédito por modalidade e indicadores macroeconômicos do Brasil."
+    grain: "1 linha por data_ref e id_modalidade (420 registros, sem nulos)"
+    columns:
+      id_fato:
+        type: "INTEGER"
+        description: "Chave primária autoincremento da fato."
+      data_ref:
+        type: "TEXT"
+        description: "Chave estrangeira para dim_tempo.data_ref (formato YYYY-MM-DD). Use para ordenação cronológica e eixo X."
+      id_modalidade:
+        type: "INTEGER"
+        description: "Chave estrangeira para dim_modalidades.id_modalidade."
+      taxa_juros_anual:
+        type: "FLOAT"
+        description: "Taxa média de juros em % ao ano (a.a.). NÃO SOMÁVEL."
+      taxa_inadimplencia_90d:
+        type: "FLOAT"
+        description: "Percentual da carteira com atraso superior a 90 dias (%). NÃO SOMÁVEL."
+      volume_concessoes_milhoes:
+        type: "FLOAT"
+        description: "Fluxo de crédito novo concedido no mês (em R$ milhões). SOMÁVEL entre modalidades e ao longo do tempo."
+      taxa_selic_meta:
+        type: "FLOAT"
+        description: "Taxa básica de juros Selic Meta (% a.a.). Repete-se nas 4 modalidades do mesmo data_ref. NÃO SOMÁVEL."
+      ipca_mensal:
+        type: "FLOAT"
+        description: "Inflação oficial mensal do Brasil (IPCA em %). Repete-se nas 4 modalidades do mesmo data_ref. NÃO SOMÁVEL entre modalidades."
+
+  dim_modalidades:
+    description: "Dimensão das modalidades de crédito monitoradas."
+    columns:
+      id_modalidade:
+        type: "INTEGER"
+        description: "Chave primária."
+      nome_modalidade:
+        type: "TEXT"
+        allowed_values:
+          - "Crédito Pessoal Não Consignado PF"
+          - "Crédito Pessoal Consignado Total PF"
+          - "Aquisição de Veículos PF"
+          - "Capital de Giro Total PJ"
+        description: "Nome exato da modalidade. SEMPRE use exatamente um destes valores em filtros WHERE."
+      segmento:
+        type: "TEXT"
+        allowed_values: ["PF", "PJ"]
+        description: "PF = Pessoa Física (famílias), PJ = Pessoa Jurídica (empresas)."
+      tipo_recurso:
+        type: "TEXT"
+        allowed_values: ["Livre"]
+        description: "Classificação do recurso no BCB (todas as 4 modalidades são de Recursos Livres)."
+
+  dim_tempo:
+    description: "Dimensão calendário mensal cobrindo de 2018-01-01 a 2026-09-01 (ano de 2026 é parcial, vai até setembro)."
+    columns:
+      data_ref:
+        type: "TEXT"
+        description: "Chave primária (YYYY-MM-DD). Use esta coluna para séries temporais."
+      ano:
+        type: "INTEGER"
+        description: "Ano de referência (2018 a 2026)."
+      mes:
+        type: "INTEGER"
+        description: "Número do mês (1 a 12)."
+      trimestre:
+        type: "INTEGER"
+        description: "Trimestre do ano (1 a 4)."
+      semestre:
+        type: "INTEGER"
+        description: "Semestre do ano (1 ou 2)."
+
+# 2. RELACIONAMENTOS PERMITIDOS (JOINS)
+relationships:
+  - from: "fato_indicadores_credito.id_modalidade"
+    to: "dim_modalidades.id_modalidade"
+    type: "INNER JOIN"
+  - from: "fato_indicadores_credito.data_ref"
+    to: "dim_tempo.data_ref"
+    type: "INNER JOIN"
+
+# 3. MÉTRICAS OFICIAIS (VERIFIED METRICS)
+metrics:
+  taxa_juros_ponderada:
+    description: "Taxa média de juros consolidada entre múltiplas modalidades, ponderada pelo volume de concessões."
+    sql: "SUM(f.taxa_juros_anual * f.volume_concessoes_milhoes) / NULLIF(SUM(f.volume_concessoes_milhoes), 0)"
+  inadimplencia_ponderada:
+    description: "Inadimplência consolidada entre múltiplas modalidades, ponderada pelo volume de concessões."
+    sql: "SUM(f.taxa_inadimplencia_90d * f.volume_concessoes_milhoes) / NULLIF(SUM(f.volume_concessoes_milhoes), 0)"
+  volume_concessoes_total:
+    description: "Soma total de crédito novo concedido em R$ milhões."
+    sql: "SUM(f.volume_concessoes_milhoes)"
+  selic_mensal_unica:
+    description: "Valor único da taxa Selic em um mês (evita duplicação pelas 4 modalidades)."
+    sql: "AVG(f.taxa_selic_meta)"
+
+# 4. REGRAS DE NEGÓCIO E GUARDRAILS PARA A LLM
+business_rules:
+  - "NUNCA use SUM() em taxa_juros_anual, taxa_inadimplencia_90d, taxa_selic_meta ou ipca_mensal."
+  - "Como taxa_selic_meta e ipca_mensal se repetem em todas as modalidades no mesmo data_ref, ao consultar indicadores macro por mês use GROUP BY f.data_ref com AVG() ou SELECT DISTINCT."
+  - "Ao consolidar juros ou inadimplência de mais de uma modalidade, SEMPRE use a média ponderada por volume_concessoes_milhoes."
+  - "Ao comparar volumes anuais com 2026, lembre que 2026 só vai até setembro (mes <= 9): compare o mesmo período (YTD) ou use média mensal."
+  - "Use SEMPRE os nomes exatos de nome_modalidade listados em allowed_values."
+  - "Inadimplência refere-se estritamente a atrasos acima de 90 dias (taxa_inadimplencia_90d)."
+  - "Ao explicar variações de juros, inadimplência, Selic ou IPCA, use pontos percentuais (p.p.) para diferença absoluta e % para variação relativa."
+  - "Ignore a tabela interna sqlite_sequence e gere APENAS queries SELECT ou WITH (read-only)."
+  - "Para filtrar o ultimo mes disponivel ou periodo mais recente, SEMPRE use f.data_ref = (SELECT MAX(data_ref) FROM fato_indicadores_credito). NUNCA use MAX(mes), pois mes (1 a 12) se repete em todos os anos."

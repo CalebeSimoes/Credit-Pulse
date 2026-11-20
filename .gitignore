@@ -1,0 +1,57 @@
+# --- Ambientes Virtuais ---
+.venv/
+venv/
+env/
+ENV/
+
+# --- Python Cache & Build ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Segredos e Variáveis de Ambiente ---
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# --- Banco de Dados Local e Dados Gerados ---
+# (Remova *.db abaixo apenas se quiser versionar o SQLite pronto no repo)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+data/raw/
+data/processed/
+*.csv
+*.parquet
+
+# --- Notebooks (caso crie testes exploratórios) ---
+.ipynb_checkpoints/
+
+# --- Logs e Arquivos Temporários ---
+*.log
+logs/
+tmp/
+temp/
+
+# --- IDEs e Editores ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- Sistema Operacional (Windows / macOS) ---
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+.DS_Store
