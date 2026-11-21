@@ -96,7 +96,7 @@ def render_kpi_header() -> None:
     var_saldo = ((atual["saldo_total"] / anterior["saldo_total"]) - 1) * 100
     c6.metric(
         "Carteira (Estoque)",
-        f"R$ {atual['saldo_total'] / 1000:.2f} tri",
+        f"R$ {atual['saldo_total'] / 1_000_000:.2f} tri",
         f"{var_saldo:+.1f}%",
     )
     st.divider()
