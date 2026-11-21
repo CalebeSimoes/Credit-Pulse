@@ -1,0 +1,17 @@
+# Interface & Visualização
+streamlit>=1.38.0,<2.0.0
+plotly>=5.24.0,<6.0.0
+
+# Dados & Banco
+pandas>=2.2.0,<3.0.0
+SQLAlchemy>=2.0.0,<3.0.0
+sqlglot>=25.0.0
+
+# IA Local & Validação
+ollama>=0.4.0,<1.0.0
+pydantic>=2.9.0,<3.0.0
+
+# Ingestão & Configuração
+requests>=2.32.0,<3.0.0
+PyYAML>=6.0.2,<7.0.0
+python-dotenv>=1.0.1,<2.0.0

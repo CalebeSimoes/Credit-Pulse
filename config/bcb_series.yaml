@@ -14,7 +14,8 @@ modalidades:
     series:
       taxa_juros_anual: 20742
       taxa_inadimplencia_90d: 21112
-      volume_concessoes_milhoes: 20662
+      volume_concessoes_milhoes: 20666
+      saldo_carteira_milhoes: 20574
 
   - id_modalidade: 2
     nome_modalidade: "Crédito Pessoal Consignado Total PF"
@@ -23,7 +24,8 @@ modalidades:
     series:
       taxa_juros_anual: 20747
       taxa_inadimplencia_90d: 21117
-      volume_concessoes_milhoes: 20667
+      volume_concessoes_milhoes: 20671
+      saldo_carteira_milhoes: 20579
 
   - id_modalidade: 3
     nome_modalidade: "Aquisição de Veículos PF"
@@ -32,7 +34,8 @@ modalidades:
     series:
       taxa_juros_anual: 20749
       taxa_inadimplencia_90d: 21119
-      volume_concessoes_milhoes: 20669
+      volume_concessoes_milhoes: 20673
+      saldo_carteira_milhoes: 20581
 
   - id_modalidade: 4
     nome_modalidade: "Capital de Giro Total PJ"
@@ -41,4 +44,5 @@ modalidades:
     series:
       taxa_juros_anual: 20723
       taxa_inadimplencia_90d: 21093
-      volume_concessoes_milhoes: 20643
+      volume_concessoes_milhoes: 20642
+      saldo_carteira_milhoes: 20550

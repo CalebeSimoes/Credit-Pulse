@@ -19,30 +19,40 @@ def get_agent(model_name: str) -> CreditPulseAgent:
 
 @st.cache_data(ttl=300)
 def load_macro_kpis() -> pd.DataFrame:
-    """Carrega os dois meses mais recentes para os cards executivos do topo."""
+    """Carrega os dois meses mais recentes unindo crédito (ponderado) e macro sem duplicação."""
     query = """
+    WITH credito_mensal AS (
+        SELECT
+            f.data_ref,
+            SUM(f.volume_concessoes_milhoes) AS volume_total,
+            SUM(f.saldo_carteira_milhoes) AS saldo_total,
+            SUM(f.taxa_juros_anual * f.volume_concessoes_milhoes)
+                / NULLIF(SUM(f.volume_concessoes_milhoes), 0) AS juros_ponderado,
+            SUM(f.taxa_inadimplencia_90d * f.saldo_carteira_milhoes)
+                / NULLIF(SUM(f.saldo_carteira_milhoes), 0) AS inadimplencia_ponderada
+        FROM fato_indicadores_credito f
+        GROUP BY f.data_ref
+    )
     SELECT
-        f.data_ref,
-        AVG(f.taxa_selic_meta) AS selic,
-        AVG(f.ipca_mensal) AS ipca,
-        SUM(f.volume_concessoes_milhoes) AS volume_total,
-        SUM(f.taxa_juros_anual * f.volume_concessoes_milhoes)
-            / NULLIF(SUM(f.volume_concessoes_milhoes), 0) AS juros_ponderado,
-        SUM(f.taxa_inadimplencia_90d * f.volume_concessoes_milhoes)
-            / NULLIF(SUM(f.volume_concessoes_milhoes), 0) AS inadimplencia_ponderada
-    FROM fato_indicadores_credito f
-    GROUP BY f.data_ref
-    ORDER BY f.data_ref DESC
+        c.data_ref,
+        fm.taxa_selic_meta AS selic,
+        fm.ipca_mensal AS ipca,
+        c.volume_total,
+        c.saldo_total,
+        c.juros_ponderado,
+        c.inadimplencia_ponderada
+    FROM credito_mensal c
+    JOIN fato_macro_mensal fm ON c.data_ref = fm.data_ref
+    ORDER BY c.data_ref DESC
     LIMIT 2
     """
     return execute_read_only_query(query)
 
 
 def render_kpi_header() -> None:
-    st.title("📊 CreditPulse — BI Conversacional de Crédito (BCB)")
+    st.title("CreditPulse — Inteligência Conversacional de Crédito (BCB)")
     st.caption(
-        "Dados oficiais da API SGS do Banco Central (2018-01 a 2026-09) · "
-        "SQLite Star Schema · Guardrails Read-Only · Ollama Local"
+        "API SGS/BCB · Constellation Schema (SQLite Read-Only + AST Sandbox) · Ollama Local"
     )
 
     kpis = load_macro_kpis()
@@ -53,7 +63,7 @@ def render_kpi_header() -> None:
     ref_mes = str(atual["data_ref"])[:7]
 
     st.markdown(f"**Panorama Consolidado ({ref_mes} vs. mês anterior)**")
-    c1, c2, c3, c4, c5 = st.columns(5)
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
 
     c1.metric(
         "Selic Meta",
@@ -66,22 +76,28 @@ def render_kpi_header() -> None:
         f"{atual['ipca'] - anterior['ipca']:+.2f} p.p.",
     )
     c3.metric(
-        "Juros Médio Ponderado",
+        "Juros Pond. (Concessões)",
         f"{atual['juros_ponderado']:.2f}% a.a.",
         f"{atual['juros_ponderado'] - anterior['juros_ponderado']:+.2f} p.p.",
         delta_color="inverse",
     )
     c4.metric(
-        "Inadimplência >90d Pond.",
+        "Inadimplência Pond. (Saldo)",
         f"{atual['inadimplencia_ponderada']:.2f}%",
         f"{atual['inadimplencia_ponderada'] - anterior['inadimplencia_ponderada']:+.2f} p.p.",
         delta_color="inverse",
     )
-    var_vol = ((atual["volume_total"] / anterior["volume_total"]) - 1) * 100
+    var_conc = ((atual["volume_total"] / anterior["volume_total"]) - 1) * 100
     c5.metric(
-        "Concessões (4 Modal.)",
+        "Concessões (Fluxo)",
         f"R$ {atual['volume_total'] / 1000:.1f} bi",
-        f"{var_vol:+.1f}%",
+        f"{var_conc:+.1f}%",
+    )
+    var_saldo = ((atual["saldo_total"] / anterior["saldo_total"]) - 1) * 100
+    c6.metric(
+        "Carteira (Estoque)",
+        f"R$ {atual['saldo_total'] / 1000:.2f} tri",
+        f"{var_saldo:+.1f}%",
     )
     st.divider()
 
